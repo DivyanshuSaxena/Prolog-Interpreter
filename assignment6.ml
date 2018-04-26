@@ -3,7 +3,7 @@ exception TypeMismatch;;
 exception NotUnifiable;; 
 open List;;
 type symbol = List;;
-type term = Const of string | Var of string | FuncSym of symbol * (term list);;
+type term = Const of string | Var of string * int | FuncSym of symbol * (term list);;
 type atom = PredSym of string * (term list) | Cut | Fail;;
 type clause = Fact of atom | Rule of (atom * (atom list)) | Query of (atom list);;
 type answer = Map of (string * term) list | Claim of bool;;
@@ -17,14 +17,14 @@ let rec fold_left_concat f e l = match l with
 					| hd::tl -> fold_left_concat f (e@(f hd)) tl;;
 
 let rec search substlist a = match substlist with
-					| (e,t)::tl -> if e=a then t else search tl a
+					| (e,n,t)::tl -> if (e,n)=a then t else search tl a
 					| [] -> raise TypeMismatch;;
 
 let rec substitute s t = match t with
 				| Const s -> Const s
-				| Var a -> let ispresent e = (match e with (v,t) -> if v=a then true else false) in
+				| Var (a,n) -> let ispresent e = (match e with (v,m,t) -> if (v,m)=(a,n) then true else false) in
 						let orfunc a b = a || b in 
-						(if (fold_left orfunc false (map ispresent s)) then (search s a) else (Var a))
+						(if (fold_left orfunc false (map ispresent s)) then (search s (a,n)) else (Var (a,n)))
 				| FuncSym (sym,l) -> FuncSym (sym, map (substitute s) l);;
 
 let rec subst sigma atom = match atom with
@@ -33,9 +33,10 @@ let rec subst sigma atom = match atom with
 					| Fail -> Fail;;
 
 let rec subst_compose s1 s2 l = match s1 with
-						| (v,t)::tl -> subst_compose tl s2 (l@[(v,substitute s2 t)]) 
+						| (v,n,t)::tl -> subst_compose tl s2 (l@[(v,n,substitute s2 t)]) 
 						| [] -> let rec ispresent l e = (match l with 
-														hd::tl -> if ((fst hd)=(fst e) && (snd hd)=(snd e)) then [] else (ispresent tl e) | [] -> [e]) in
+														| (hdfst,hdsnd,hdt)::tl -> (match e with (v,n,t) -> if (hdfst=v && hdsnd=n) then [] else (ispresent tl e)) 
+														| [] -> [e]) in
 								let concat a b = a@b in 
 								(l@(fold_left concat [] (map (ispresent l) s2)));;
 
@@ -48,19 +49,19 @@ let rec fold_duo f g e l1 l2 = match (l1,l2) with
 						| _ -> raise TypeMismatch;;
 
 let rec vars term = match term with
-					| Var a -> [a]
+					| Var (a,n) -> [(a,n)]
 					| Const a -> []
 					| FuncSym (s,l) -> fold_left_concat vars [] l;;
 
 let rec mgu t1 t2 = match t1 with
-					| Var (a) -> if t1=t2 then [] else [(a,t2)]
+					| Var (a,n) -> if t1=t2 then [] else [(a,n,t2)]
 					| Const s -> if t1=t2 then [] else (mgu t2 t1)
 					| FuncSym (List, l) -> (match t2 with
-								| Var a -> mgu t2 t1 | Const s2 -> raise NotUnifiable
+								| Var (a,n) -> mgu t2 t1 | Const s2 -> raise NotUnifiable
 								| FuncSym (List, l2) -> let rec mgulist l1 l2 = (match (l1,l2) with
 										| (x1::xs1,x2::xs2) -> let sigma = mgu x1 x2 in compose sigma (mgulist (map (substitute sigma) xs1) (map (substitute sigma) xs2))
-										| ([],xs) -> let isvar e = (match e with | (Var a) -> true | _ -> false) in 
-													let mapempty e = (match e with | (Var a) -> (a,FuncSym (List, [])) | _ -> raise NotUnifiable) in
+										| ([],xs) -> let isvar e = (match e with | (Var (a,n)) -> true | _ -> false) in 
+													let mapempty e = (match e with | (Var (a,n)) -> (a,n,FuncSym (List, [])) | _ -> raise NotUnifiable) in
 													let andf a b = a && b in
 													(if (fold_left andf true (map isvar xs)) then (map mapempty xs) else raise NotUnifiable) 
 										| (xs,[]) -> mgulist l2 l1 ) 
@@ -84,39 +85,41 @@ let rec matchgoal cl goal goals = (match cl with
 							| Rule (h,b) -> let sigma = (unify h goal) in (if sigma=[] then [] else (map (subst sigma) b@goals))
 							| _ -> raise TypeMismatch );;
 
-let rec evaluate goals program subs = match goals with
-					| [] -> subs
-					| currgoal::gl ->  let result = [] in
-						let rec goalloop prg rem goal goals = (match rem with
-							| cl::tl -> let sigma = (match cl with | Fact h -> (unify h goal) | Rule (h,b) -> (unify h goal) | _ -> raise TypeMismatch) in
+let rec evaluate goals program subs = let rec increment e = (match e with (v,n,t) -> (v,n+1,t)) in  
+						let subsnamed = (map increment subs) in
+						match goals with
+						| [] -> subsnamed
+						| currgoal::gl ->  let result = [] in
+							let rec goalloop prg rem goal goals = (match rem with
+								| cl::tl -> let sigma = (match cl with | Fact h -> (unify h goal) | Rule (h,b) -> (unify h goal) | _ -> raise TypeMismatch) in
 										(match sigma with
 											| [] -> goalloop prg tl goal goals
 											| _ -> let remgoals = matchgoal cl goal goals in (match remgoals with
-														| [] -> (compose sigma subs)
-														| _ -> (evaluate remgoals prg (compose sigma subs)) ))
-							| [] -> []) in (goalloop program program currgoal gl);;
+														| [] -> (compose sigma subsnamed)
+														| _ -> (evaluate remgoals prg (compose sigma subsnamed)) ))
+								| [] -> []) in (goalloop program program currgoal gl);;
 
 (* Test Cases *)
-let goal1 = PredSym ("append", [FuncSym (List, [Const "1"; FuncSym (List, [Const "2"])]); FuncSym (List, [Const "3"; FuncSym (List, [Const "4"])]); Var "x"]);;
-let goal2 = PredSym ("append", [FuncSym (List, [Const "1"]); FuncSym (List, [Const "3"]); Var "x"]);;
-let facth = PredSym ("append", [FuncSym (List, []); FuncSym (List, [Var "L"]); FuncSym (List, [Var "L"])]	);;
-let ruleh = PredSym ("append", [FuncSym (List, [Var "X"; Var "Xs"]); Var "L"; FuncSym (List, [Var "X"; Var "L2"]) ]);;
+let goal1 = PredSym ("append", [FuncSym (List, [Const "1"; FuncSym (List, [Const "2"])]); FuncSym (List, [Const "3"; FuncSym (List, [Const "4"])]); Var ("x",0)]);;
+let goal2 = PredSym ("append", [FuncSym (List, [Const "1"]); FuncSym (List, [Const "3"]); Var ("x",0)]);;
+let facth = PredSym ("append", [FuncSym (List, []); FuncSym (List, [Var ("L",0)]); FuncSym (List, [Var ("L",0)])]	);;
+let ruleh = PredSym ("append", [FuncSym (List, [Var ("X",0); Var ("Xs",0)]); Var ("L",0); FuncSym (List, [Var ("X",0); Var ("L2",0)]) ]);;
 let rule = 	Rule (
 		ruleh,
 		[PredSym ("append",
-			[Var "Xs"; Var "L"; Var "L2"]
+			[Var ("Xs",0); Var ("L",0); Var ("L2",0)]
 		)]
 	);;
 let prgm = [
 	Fact (
 		PredSym ("append", 
-			[FuncSym (List, []); Var "L"; Var "L"]
+			[FuncSym (List, []); Var ("L",0); Var ("L",0)]
 		)
 	);
 	Rule (
 		ruleh,
 		[PredSym ("append", 
-			[Var "Xs"; Var "L"; Var "L2"]
+			[Var ("Xs",0); Var ("L",0); Var ("L2",0)]
 		)]
 	)];;
 unify facth goal1;;
