@@ -71,10 +71,9 @@ let rec mgu t1 t2 = match t1 with
 													let andf a b = a && b in
 													(if (fold_left andf true (map isvar xs)) then (map mapempty xs) else raise NotUnifiable) 
 										| (xs,[]) -> mgulist l2 l1 ) 
-									in (mgulist l l2) );;
-								| _ -> raise NotUnifiable);;
+									in (mgulist l l2) )
 					| FuncSym (s,l) -> (match t2 with
-								| Var a -> mgu t2 t1 | Const s2 -> raise NotUnifiable
+								| Var (a,n) -> mgu t2 t1 | Const s2 -> raise NotUnifiable
 								| FuncSym (s2,l2) -> if (s=s2 && (length l)=(length l2)) then (fold_duo compose mgu [] l l2) 
 									else raise NotUnifiable);;
 
@@ -109,29 +108,33 @@ let rec evalquery goals program subs stack = let subsnamed = (map increment subs
 						| currgoal::gl ->  let rec goalloop prg rem goal goals stack = (match rem with
 								| cl::tl -> let sigma = (match cl with | Fact h -> (unify h goal) | Rule (h,b) -> (unify h goal) | _ -> raise TypeMismatch) in
 										(match sigma with
-											| [] -> goalloop prg tl goal goals stack
+											| [] -> goalloop prg tl goal goals (List.tl stack)
 											| _ -> let remgoals = matchgoal cl goal goals in (match remgoals with
-													| [] -> if stack=[] then [(compose sigma subsnamed)] else (goalloop prg tl goal goals (List.tl stack))@[(compose sigma subsnamed)]
-													| _ -> (evalquery (map incratom remgoals) prg (compose sigma subsnamed) ([goal::goals,tl]@stack)) ))
+													| [] -> if stack=[] then [(compose sigma subsnamed)] else [(compose sigma subsnamed)]@(goalloop prg tl goal goals (List.tl stack))
+													| _ -> (evalquery (map incratom (map (subst sigma) remgoals)) prg (compose sigma subsnamed) ([goal::goals,tl]@stack)) ))
 								| [] -> if stack=[] then [] else 
 											goalloop prg (snd (hd stack)) (hd (fst (hd stack))) (tl (fst (hd stack))) (tl stack) ) in 
-										(goalloop program program currgoal gl stack);;
+										(goalloop program program currgoal gl ((currgoal::gl,List.tl program)::stack));;
 
-let rec evaluate program queries = let stripquery queries = (match queries with | (Query l) -> l | _ -> raise TypeMismatch) in
-						let goals = stripquery queries in
+let rec evaluate program querylist = let stripquery queries = (match queries with | (Query l) -> l | _ -> raise TypeMismatch) in
+						let goals = stripquery querylist in
 						(try
 							let rawsubslist = evalquery goals program [] [] in
-							let rec reduce ans subs = (match subs with
+							let rec reduce subs ans = (match subs with
 										| (v,n,t)::tl -> if tl=[] then (if not (String.contains v '#') then ans else ((v,t)::ans)) else
-												(if (String.contains v '#') then reduce ((v,t)::ans) tl else reduce ans (map (substsubst [(v,n,t)]) tl))
+												(if (String.contains v '#') then reduce tl ((v,t)::ans) else reduce (map (substsubst [(v,n,t)]) tl) ans)
 										| [] -> []) in
 							let convans finalsubs = (match finalsubs with
 								| [] -> Claim (true)
 								| hd::tl -> Map (hd::tl)) in
-							let partlist = (match rawsubslist with | [] -> raise GoalUnmatched | _ -> map (reduce []) rawsubslist) in
-							(map convans partlist)
+							let rec reducelist rawsubs = (match rawsubs with
+								| hd::tl -> (reduce hd [])::(reducelist tl)
+								| [] -> []) in
+							match rawsubslist with
+							| [] -> raise GoalUnmatched
+							| _ -> (map convans (reducelist rawsubslist))
 						with
-						| GoalUnmatched -> [Claim (false)]
+						| GoalUnmatched -> [Claim false]
 						| _ -> failwith "Unknown");;
 						
 (* Test Cases *)
@@ -163,19 +166,30 @@ evalquery [goal2] prgm [] [];;
 evalquery [goal1] prgm [] [];;
 evaluate prgm (Query [goal1]);;
 evaluate prgm (Query [goal2]);;
-
 (* append([],L,L).
 append([X|Xs],L,[X|L2]) :- append(Xs,L,L2). *)
 
 (* Test Case 2 *)
-let memfact = Fact(PredSym("member", [Var ("X",0); FuncSym (List, [Var ("X",0); Var ("Y",0)])]));;
+let memfact = Fact(PredSym("member", [Var ("X",0); FuncSym (List, [Var ("X",0); Var ("Xs",0)])]));;
 let memrule = Rule(PredSym("member", [Var ("X",0); FuncSym (List, [Var ("Y",0); Var ("L",0)])]), [PredSym("member", [Var("X",0); Var("L",0)])]);;
 let p = [memfact;memrule];;
 let goal4 = PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; FuncSym (List, [Const "b"])])]);;
-let goals5 = [PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; Const "b"])]); PredSym ("member",[Var("#Z",0); FuncSym (List, [Const "b";Const "c"])])];;
-let q1 = Query([PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; Const "b"])]); PredSym ("member",[Var("#Z",0); FuncSym (List, [Const "b";Const "c"])])]);;
-let q2 = Query([PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; Const "b"])])]);;
-(* evalquery goals5 p [] [];; *)
+let goals5 = [PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; FuncSym (List, [Const "b"])])]); PredSym ("member",[Var("#Z",0); FuncSym (List, [Const "b"; FuncSym (List, [Const "c"])])])];;
+let q1 = Query(
+			[PredSym ("member",
+				[Var ("#Z",0); 
+				FuncSym (List, [Const "a"; FuncSym (List, [Const "b"])])
+				]
+			); 
+			PredSym ("member",
+				[Var("#Z",0); 
+				FuncSym (List, [Const "b"; FuncSym (List, [Const "c"])])
+				]
+			)]
+		);;
+let q2 = Query([PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; FuncSym (List, [Const "b"])])])]);;
+evalquery [goal4] p [] [];;
+evalquery goals5 p [] [];;
 evaluate p q2;;
 evaluate p q1;;
 
