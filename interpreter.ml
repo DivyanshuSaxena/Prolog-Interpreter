@@ -1,5 +1,6 @@
 exception TypeMismatch;; 
 exception NotUnifiable;; 
+exception GoalUnmatched;;
 open List;;
 (* Sigma :- string * int * term list *) 
 (* Increment in substitution woring fine but unification with fact for bigger lists failing *)
@@ -32,6 +33,9 @@ let rec subst sigma atom = match atom with
 					| PredSym (name,terms) -> PredSym (name, map (substitute sigma) terms)
 					| Cut -> Cut
 					| Fail -> Fail;;
+
+let substsubst sigma e = match e with
+					| (v,n,t) -> (v,n,substitute sigma t);;
 
 let rec subst_compose s1 s2 l = match s1 with
 						| (v,n,t)::tl -> subst_compose tl s2 (l@[(v,n,substitute s2 t)]) 
@@ -107,24 +111,30 @@ let rec evalquery goals program subs stack = let subsnamed = (map increment subs
 											| [] -> goalloop prg tl goal goals
 											| _ -> let remgoals = matchgoal cl goal goals in (match remgoals with
 														| [] -> (compose sigma subsnamed)
-														| _ -> (evalquery (map incratom remgoals) prg (compose sigma subsnamed) (tl@stack)) ))
-								| [] -> []) in (goalloop program program currgoal gl);;
+														| _ -> (evalquery (map incratom remgoals) prg (compose sigma subsnamed) ([currgoal,tl]@stack)) ))
+								| [] -> raise GoalUnmatched) in (goalloop program program currgoal gl);;
 
-(* let rec stripquery queries l = match queries with
-						| (Query q)::tl -> (stripquery tl l@[q])
-						| [] -> l;;
-
-let rec evaluate program queries = let goals = stripquery queries [] in
-						let rawsubs = evalquery goals program [] in
-						let rec reduce subs ans = match subs with
-						| (v,n,t)::tl -> reduce (map (substitute [(v,n,t)]) tl)
-						| [] -> expr2 *)
-
+let rec evaluate program queries = let stripquery queries = (match queries with | (Query l) -> l | _ -> raise TypeMismatch) in
+						let goals = stripquery queries in
+						(try
+							let rawsubs = evalquery goals program [] [] in
+							let rec reduce subs ans = (match subs with
+										| (v,n,t)::tl -> if tl=[] then (if not (String.contains v '#') then [] else ((v,t)::ans)) else
+												(if not (String.contains v '#') then reduce (map (substsubst [(v,n,t)]) tl) ans else reduce tl ((v,t)::ans))
+										| [] -> []) in
+							let finalsubs = reduce rawsubs [] in
+							(match finalsubs with
+							| [] -> Claim (true)
+							| hd::tl -> Map (hd::tl))
+						with
+						| GoalUnmatched -> Claim (false)
+						| _ -> failwith "Unknown");;
+						
 (* Test Cases *)
 
 (* Test Case 1 *)
-let goal1 = PredSym ("append", [FuncSym (List, [Const "1"; FuncSym (List, [Const "2"])]); FuncSym (List, [Const "3"; FuncSym (List, [Const "4"])]); Var ("x",0)]);;
-let goal2 = PredSym ("append", [FuncSym (List, [Const "1"]); FuncSym (List, [Const "3"]); Var ("x",0)]);;
+let goal1 = PredSym ("append", [FuncSym (List, [Const "1"; FuncSym (List, [Const "2"])]); FuncSym (List, [Const "3"; FuncSym (List, [Const "4"; Const "5"])]); Var ("#x",0)]);;
+let goal2 = PredSym ("append", [FuncSym (List, [Const "1"]); FuncSym (List, [Const "3"]); FuncSym(List, [Const "1"; FuncSym (List, [Const "3"])])]);;
 let facth = PredSym ("append", [FuncSym (List, []); Var ("L",0); Var ("L",0)]);;
 let ruleh = PredSym ("append", [FuncSym (List, [Var ("X",0); Var ("Xs",0)]); Var ("L",0); FuncSym (List, [Var ("X",0); Var ("L2",0)]) ]);;
 let rule = 	Rule (
@@ -147,6 +157,8 @@ let prgm = [
 	)];;
 evalquery [goal2] prgm [] [];;
 evalquery [goal1] prgm [] [];;
+evaluate prgm (Query [goal1]);;
+evaluate prgm (Query [goal2]);;
 
 (* append([],L,L).
 append([X|Xs],L,[X|L2]) :- append(Xs,L,L2). *)
