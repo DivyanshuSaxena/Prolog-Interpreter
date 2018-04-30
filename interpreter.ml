@@ -72,11 +72,11 @@ let rec mgu t1 t2 = match t1 with
 													(if (fold_left andf true (map isvar xs)) then (map mapempty xs) else raise NotUnifiable) 
 										| (xs,[]) -> mgulist l2 l1 ) 
 									in (mgulist l l2) );;
-					(* 			| _ -> raise NotUnifiable);;
+								| _ -> raise NotUnifiable);;
 					| FuncSym (s,l) -> (match t2 with
 								| Var a -> mgu t2 t1 | Const s2 -> raise NotUnifiable
 								| FuncSym (s2,l2) -> if (s=s2 && (length l)=(length l2)) then (fold_duo compose mgu [] l l2) 
-									else raise NotUnifiable);; *)
+									else raise NotUnifiable);;
 
 let rec unify atom1 atom2 = match (atom1,atom2) with
 					| (PredSym (s1,terml1),PredSym (s2,terml2)) -> (try
@@ -111,9 +111,9 @@ let rec evalquery goals program subs stack = let subsnamed = (map increment subs
 										(match sigma with
 											| [] -> goalloop prg tl goal goals stack
 											| _ -> let remgoals = matchgoal cl goal goals in (match remgoals with
-													| [] -> [(compose sigma subsnamed)]
+													| [] -> if stack=[] then [(compose sigma subsnamed)] else (goalloop prg tl goal goals (List.tl stack))@[(compose sigma subsnamed)]
 													| _ -> (evalquery (map incratom remgoals) prg (compose sigma subsnamed) ([goal::goals,tl]@stack)) ))
-								| [] -> if stack=[] then raise GoalUnmatched else 
+								| [] -> if stack=[] then [] else 
 											goalloop prg (snd (hd stack)) (hd (fst (hd stack))) (tl (fst (hd stack))) (tl stack) ) in 
 										(goalloop program program currgoal gl stack);;
 
@@ -128,14 +128,13 @@ let rec evaluate program queries = let stripquery queries = (match queries with 
 							let convans finalsubs = (match finalsubs with
 								| [] -> Claim (true)
 								| hd::tl -> Map (hd::tl)) in
-							let partlist = map (reduce []) rawsubslist in
+							let partlist = (match rawsubslist with | [] -> raise GoalUnmatched | _ -> map (reduce []) rawsubslist) in
 							(map convans partlist)
 						with
 						| GoalUnmatched -> [Claim (false)]
 						| _ -> failwith "Unknown");;
 						
 (* Test Cases *)
-
 (* Test Case 1 *)
 let goal1 = PredSym ("append", [FuncSym (List, [Const "1"; FuncSym (List, [Const "2"])]); FuncSym (List, [Const "3"; FuncSym (List, [Const "4"; Const "5"])]); Var ("#x",0)]);;
 let goal2 = PredSym ("append", [FuncSym (List, [Const "1"]); FuncSym (List, [Const "3"]); FuncSym(List, [Const "1"; FuncSym (List, [Const "4"])])]);;
