@@ -1,8 +1,8 @@
-(* Sigma :- string * int * term list *) 
-(* Increment in substitution woring fine but unification with fact for bigger lists failing *)
 exception TypeMismatch;; 
 exception NotUnifiable;; 
 open List;;
+(* Sigma :- string * int * term list *) 
+(* Increment in substitution woring fine but unification with fact for bigger lists failing *)
 type symbol = List;;
 type term = Const of string | Var of string * int | FuncSym of symbol * (term list);;
 type atom = PredSym of string * (term list) | Cut | Fail;;
@@ -38,7 +38,7 @@ let rec subst_compose s1 s2 l = match s1 with
 						| [] -> let rec ispresent l e = (match l with 
 														| (hdfst,hdsnd,hdt)::tl -> (match e with (v,n,t) -> if (hdfst=v && hdsnd=n) then [] else (ispresent tl e)) 
 														| [] -> [e]) in
-								let concat a b = a@b in 
+								let concat a b = b@a in 
 								(l@(fold_left concat [] (map (ispresent l) s2)));;
 
 let compose s1 s2 = subst_compose s1 s2 [];;
@@ -98,17 +98,16 @@ let incratom atom  = match atom with
 
 let rec increment e = (match e with (v,n,t) -> (v,n+1,increvar t));;
 
-let rec evalquery goals program subs = let subsnamed = (map increment subs) in
+let rec evalquery goals program subs stack = let subsnamed = (map increment subs) in
 						match goals with
 						| [] -> subsnamed
-						| currgoal::gl ->  let result = [] in
-							let rec goalloop prg rem goal goals = (match rem with
+						| currgoal::gl ->  let rec goalloop prg rem goal goals = (match rem with
 								| cl::tl -> let sigma = (match cl with | Fact h -> (unify h goal) | Rule (h,b) -> (unify h goal) | _ -> raise TypeMismatch) in
 										(match sigma with
 											| [] -> goalloop prg tl goal goals
 											| _ -> let remgoals = matchgoal cl goal goals in (match remgoals with
 														| [] -> (compose sigma subsnamed)
-														| _ -> (evaluate (map incratom remgoals) prg (compose sigma subsnamed)) ))
+														| _ -> (evalquery (map incratom remgoals) prg (compose sigma subsnamed) (tl@stack)) ))
 								| [] -> []) in (goalloop program program currgoal gl);;
 
 (* let rec stripquery queries l = match queries with
@@ -122,6 +121,8 @@ let rec evaluate program queries = let goals = stripquery queries [] in
 						| [] -> expr2 *)
 
 (* Test Cases *)
+
+(* Test Case 1 *)
 let goal1 = PredSym ("append", [FuncSym (List, [Const "1"; FuncSym (List, [Const "2"])]); FuncSym (List, [Const "3"; FuncSym (List, [Const "4"])]); Var ("x",0)]);;
 let goal2 = PredSym ("append", [FuncSym (List, [Const "1"]); FuncSym (List, [Const "3"]); Var ("x",0)]);;
 let facth = PredSym ("append", [FuncSym (List, []); Var ("L",0); Var ("L",0)]);;
@@ -144,32 +145,10 @@ let prgm = [
 			[Var ("Xs",0); Var ("L",0); Var ("L2",0)]
 		)]
 	)];;
-unify facth goal1;;
-(* unify facth goal2;; *)
-let sigma1 = unify ruleh goal1;;
-(* let sigma2 = unify ruleh goal2;; *)
-let pass1 = compose sigma1 [];;
-(* let pass2 = compose sigma2 [];; *)
-let remgoals1 = matchgoal rule goal1 [];;
-(* let remgoals2 = matchgoal rule goal2 [];; *)
-let remgoal1 = hd remgoals1;;
-(* let remgoal2 = hd remgoals2;; *)
-unify facth remgoal1;;
-(* unify facth remgoal2;; *)
-unify ruleh remgoal1;;
-matchgoal rule remgoal1 [];;  
-(* matchgoal (Fact facth) remgoal2 [];;   *)
-evaluate [goal2] prgm [];;
-(* evaluate [goal1] prgm [];; *)
+evalquery [goal2] prgm [] [];;
+evalquery [goal1] prgm [] [];;
 
 (* append([],L,L).
 append([X|Xs],L,[X|L2]) :- append(Xs,L,L2). *)
 
-(* let remgoals = matchgoal cl goal goals in (match remgoals with
-| [] -> goalloop prg tl goal goals
-| _ -> (evaluate remgoals prg prg (compose sigma subs)) ) *)
-
-(* PredSym ("append",
-   [FuncSym (List, []);
-    FuncSym (List, [Const "3"]);
-	Var ("L2", 1)]) *)
+(* Test Case 2 *)
