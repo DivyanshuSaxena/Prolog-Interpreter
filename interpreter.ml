@@ -4,11 +4,12 @@ exception GoalUnmatched;;
 open List;;
 (* Sigma :- string * int * term list *) 
 (* Increment in substitution woring fine but unification with fact for bigger lists failing *)
-type symbol = List;;
-type term = Const of string | Var of string * int | FuncSym of symbol * (term list);;
+type symbol = List | Plus | Minus | Prod | Div | Mod | Exp | Eq | Gt | Lt | Gte | Lte;;
+type term = Const of int | Bool of bool | Cons of string | Var of string * int | FuncSym of symbol * (term list);;
 type atom = PredSym of string * (term list) | Cut | Fail;;
 type clause = Fact of atom | Rule of (atom * (atom list)) | Query of (atom list);;
 type answer = Map of (string * term) list | Claim of bool;;
+type program = clause list;;
 
 let rec fold_left f e l = match l with	
 					| [] -> e
@@ -24,6 +25,8 @@ let rec search substlist a = match substlist with
 
 let rec substitute s t = match t with
 				| Const s -> Const s
+				| Cons s -> Cons s
+				| Bool b -> Bool b
 				| Var (a,n) -> let ispresent e = (match e with (v,m,t) -> if (v,m)=(a,n) then true else false) in
 						let orfunc a b = a || b in 
 						(if (fold_left orfunc false (map ispresent s)) then (search s (a,n)) else (Var (a,n)))
@@ -56,13 +59,18 @@ let rec fold_duo f g e l1 l2 = match (l1,l2) with
 let rec vars term = match term with
 					| Var (a,n) -> [(a,n)]
 					| Const a -> []
+					| Cons s -> []
+					| Bool b -> []
 					| FuncSym (s,l) -> fold_left_concat vars [] l;;
 
 let rec mgu t1 t2 = match t1 with
 					| Var (a,n) -> if t1=t2 then [] else [(a,n,t2)]
 					| Const s -> if t1=t2 then [] else (match t2 with | Const s2 -> raise NotUnifiable | _ -> (mgu t2 t1))
-					| FuncSym (List, l) -> (match t2 with
-								| Var (a,n) -> mgu t2 t1 | Const s2 -> raise NotUnifiable
+					| Cons s -> if t1=t2 then [] else (match t2 with | Cons s2 -> raise NotUnifiable | _ -> (mgu t2 t1))
+					| Bool b -> if t1=t2 then [] else (match t2 with | Bool b2 -> raise NotUnifiable | _ -> (mgu t2 t1))
+					| FuncSym (s, l) -> (match s with 
+						| List -> (match t2 with
+								| Var (a,n) -> mgu t2 t1 | Const n2 -> raise NotUnifiable | Bool b2 -> raise NotUnifiable | Cons s2 -> raise NotUnifiable
 								| FuncSym (List, []) -> if l=[] then [] else raise NotUnifiable
 								| FuncSym (List, l2) -> let rec mgulist l1 l2 = (match (l1,l2) with
 										| (x1::xs1,x2::xs2) -> let sigma = mgu x1 x2 in compose sigma (mgulist (map (substitute sigma) xs1) (map (substitute sigma) xs2))
@@ -71,11 +79,12 @@ let rec mgu t1 t2 = match t1 with
 													let andf a b = a && b in
 													(if (fold_left andf true (map isvar xs)) then (map mapempty xs) else raise NotUnifiable) 
 										| (xs,[]) -> mgulist l2 l1 ) 
-									in (mgulist l l2) )
-					| FuncSym (s,l) -> (match t2 with
-								| Var (a,n) -> mgu t2 t1 | Const s2 -> raise NotUnifiable
+									in (mgulist l l2)
+								| FuncSym (_, l2) -> raise NotUnifiable ) 
+						| _ -> (match t2 with
+								| Var (a,n) -> mgu t2 t1 | Const s2 -> raise NotUnifiable | Bool b2 -> raise NotUnifiable | Cons c2 -> raise NotUnifiable
 								| FuncSym (s2,l2) -> if (s=s2 && (length l)=(length l2)) then (fold_duo compose mgu [] l l2) 
-									else raise NotUnifiable);;
+									else raise NotUnifiable) );;
 
 let rec unify atom1 atom2 = match (atom1,atom2) with
 					| (PredSym (s1,terml1),PredSym (s2,terml2)) -> (try
@@ -93,6 +102,8 @@ let rec matchgoal cl goal goals = (match cl with
 let rec increvar term = match term with
 						| Var (s,n) -> Var (s,n+1)
 						| Const n -> Const n
+						| Cons s -> Cons s
+						| Bool b -> Bool b
 						| FuncSym (s,tl) -> FuncSym (s,map increvar tl);;
 
 let incratom atom  = match atom with
@@ -139,9 +150,9 @@ let rec evaluate program querylist = let stripquery queries = (match queries wit
 						
 (* Test Cases *)
 (* Test Case 1 *)
-let goal1 = PredSym ("append", [FuncSym (List, [Const "1"; FuncSym (List, [Const "2"])]); FuncSym (List, [Const "3"; FuncSym (List, [Const "4"; Const "5"])]); Var ("#x",0)]);;
-let goal2 = PredSym ("append", [FuncSym (List, [Const "1"]); FuncSym (List, [Const "3"]); FuncSym(List, [Const "1"; FuncSym (List, [Const "4"])])]);;
-let goal3 = PredSym ("append", [FuncSym (List, []); FuncSym (List, [Const "3"]); FuncSym(List, [Const "1"])]);;
+let goal1 = PredSym ("append", [FuncSym (List, [Const 1; FuncSym (List, [Const 2])]); FuncSym (List, [Const 3; FuncSym (List, [Const 4; Const 5])]); Var ("#x",0)]);;
+let goal2 = PredSym ("append", [FuncSym (List, [Const 1]); FuncSym (List, [Const 3]); FuncSym(List, [Const 1; FuncSym (List, [Const 4])])]);;
+let goal3 = PredSym ("append", [FuncSym (List, []); FuncSym (List, [Const 3]); FuncSym(List, [Const 1])]);;
 let facth = PredSym ("append", [FuncSym (List, []); Var ("L",0); Var ("L",0)]);;
 let ruleh = PredSym ("append", [FuncSym (List, [Var ("X",0); Var ("Xs",0)]); Var ("L",0); FuncSym (List, [Var ("X",0); Var ("L2",0)]) ]);;
 let rule = 	Rule (
@@ -173,21 +184,21 @@ append([X|Xs],L,[X|L2]) :- append(Xs,L,L2). *)
 let memfact = Fact(PredSym("member", [Var ("X",0); FuncSym (List, [Var ("X",0); Var ("Xs",0)])]));;
 let memrule = Rule(PredSym("member", [Var ("X",0); FuncSym (List, [Var ("Y",0); Var ("L",0)])]), [PredSym("member", [Var("X",0); Var("L",0)])]);;
 let p = [memfact;memrule];;
-let goal4 = PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; FuncSym (List, [Const "b"])])]);;
-let goals5 = [PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; FuncSym (List, [Const "b"])])]); PredSym ("member",[Var("#Z",0); FuncSym (List, [Const "b"; FuncSym (List, [Const "c"])])])];;
+let goal4 = PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const 1; FuncSym (List, [Const 2])])]);;
+let goals5 = [PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const 1; FuncSym (List, [Const 2])])]); PredSym ("member",[Var("#Z",0); FuncSym (List, [Const 2; FuncSym (List, [Const 3])])])];;
 let q1 = Query(
 			[PredSym ("member",
 				[Var ("#Z",0); 
-				FuncSym (List, [Const "a"; FuncSym (List, [Const "b"])])
+				FuncSym (List, [Const 1; FuncSym (List, [Const 2])])
 				]
 			); 
 			PredSym ("member",
 				[Var("#Z",0); 
-				FuncSym (List, [Const "b"; FuncSym (List, [Const "c"])])
+				FuncSym (List, [Const 2; FuncSym (List, [Const 3])])
 				]
 			)]
 		);;
-let q2 = Query([PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const "a"; FuncSym (List, [Const "b"])])])]);;
+let q2 = Query([PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const 1; FuncSym (List, [Const 2])])])]);;
 evalquery [goal4] p [] [];;
 evalquery goals5 p [] [];;
 evaluate p q2;;
