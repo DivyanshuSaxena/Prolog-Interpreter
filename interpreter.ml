@@ -12,46 +12,6 @@ type clause = Fact of atom | Rule of (atom * (atom list)) | Query of (atom list)
 type answer = Map of (string * term) list | Claim of bool;;
 type program = clause list;;
 
-
-let rec print_term term = let rec print_tlist tlist = (match tlist with
-    | hd::tl -> (print_term hd)^"; "^(print_tlist tl)
-    | [] -> "]") in (match term with
-		    | Const n -> string_of_int n
-		    | Cons s -> s
-		    | Bool b -> string_of_bool b
-		    | Var (v,n) -> v
-		    | FuncSym (List,tlist) -> "List["^(print_tlist tlist)
-		    | FuncSym (Plus,tlist) -> "Plus["^(print_tlist tlist)
-		    | FuncSym (Minus,tlist) -> "Minus["^(print_tlist tlist)
-		    | FuncSym (Prod,tlist) -> "Prod["^(print_tlist tlist)
-		    | FuncSym (Div,tlist) -> "Div["^(print_tlist tlist)
-		    | FuncSym (Mod,tlist) -> "Mod["^(print_tlist tlist)
-		    | FuncSym (Exp,tlist) -> "Exp["^(print_tlist tlist)
-		    | FuncSym (Eq,tlist) -> "Eq["^(print_tlist tlist)
-		    | FuncSym (Gt,tlist) -> "Gt["^(print_tlist tlist)
-		    | FuncSym (Lt,tlist) -> "Lt["^(print_tlist tlist)
-		    | FuncSym (Gte,tlist) -> "Gte["^(print_tlist tlist)
-		    | FuncSym (Lte,tlist) -> "Lte["^(print_tlist tlist) );;
-
-let print_atom atom = (match atom with
-    | PredSym(str,tlist) -> let rec print_tlist tlist = (match tlist with
-							    | hd::tl -> (print_term hd)^"; "^(print_tlist tl)
-							    | [] -> "]") in str^"["^(print_tlist tlist)
-    | Cut -> "Cut" | Fail -> "Fail");;
-
-let rec print_alist alist = (match alist with
-	| hd::tl -> (print_atom hd)^"; "^(print_alist tl)
-	| [] -> "]");;
-
-let print_clause clause = (match clause with
-    | Fact atom -> (print_atom atom)^"."
-    | Rule (atom,alist) -> (print_atom atom)^":- ["^(print_alist alist)^"."
-    | _ -> raise InvalidConstruct);;
-
-let rec print_program prg = (match prg with
-    | hd::tl -> (print_clause hd)^"; "^(print_program tl)
-    | [] -> "]");;
-
 let rec fold_left f e l = match l with	
 					| [] -> e
 					| hd::tl -> fold_left f (f hd e) tl;;
@@ -175,7 +135,7 @@ let rec unify atom1 atom2 = match (atom1,atom2) with
 					| _ -> [];; 
 
 let rec matchgoal cl goal goals = (match cl with
-						| Fact h -> let sigma = (unify h goal) in Printf.printf "Matchedgoal %s with goal %s\n" (print_clause cl) (print_atom goal); (if sigma=[] then [] else map (subst sigma) goals)
+						| Fact h -> let sigma = (unify h goal) in (if sigma=[] then [] else map (subst sigma) goals)
 						| Rule (h,b) -> let sigma = (unify h goal) in (if sigma=[] then [] else (map (subst sigma) b@goals))
 						| _ -> raise TypeMismatch );;
 
@@ -202,19 +162,19 @@ let rec evalquery goals program rem subs stack = let subsnamed = (map increment 
 												| [] -> evalquery goals program tl subs stack
 												| _ -> let remgoals = matchgoal cl (hd goals) (List.tl goals) in 
 														Printf.printf "%s\n" (print_alist remgoals); (match remgoals with
-														| [] -> if stack=[] then (Printf.printf "Goals and stack empty\n"; [(compose sigma subsnamed)] ) else (Printf.printf "No more goals but stack remaining\n"; [(compose sigma subsnamed)]@(evalquery goals program tl [] (List.tl stack)) )
+														| [] -> if stack=[] then (Printf.printf "Goals and stack empty\n"; [(compose sigma subsnamed)] ) else 
+															(Printf.printf "No more goals but stack remaining\n"; [(compose sigma subsnamed)]@(evalquery goals program tl [] (List.tl stack)) )
 														| _ -> (Printf.printf "Goals remaining\n"; (evalquery (map incratom (map (subst sigma) remgoals)) program program (compose sigma subsnamed) ([goals,tl]@stack))) ))
-									| [] -> if stack=[] then (Printf.printf "Program and stack empty\n"; []) else (Printf.printf "Program empty, stack remaining\n"; evalquery (fst (hd stack)) program (snd (hd stack)) subs (tl stack)) );;
+									| [] -> if stack=[] then (Printf.printf "Program and stack empty\n"; []) else (Printf.printf "Program empty, stack remaining\n"; evalquery (fst (hd stack)) program (snd (hd stack)) [] (tl stack)) );;
 
 (* let rec evalquery goals program subs stack = let subsnamed = (map increment subs) in
 						match goals with
 						| [] -> [subsnamed]
-						| currgoal::gl ->  Printf.printf "Present goal %s\n" (print_atom currgoal); let rec goalloop prg rem goal goals stack = (match rem with
+						| currgoal::gl ->  let rec goalloop prg rem goal goals stack = (match rem with
 								| cl::tl -> let sigma = (match cl with | Fact h -> (unify h goal) | Rule (h,b) -> (unify h goal) | _ -> raise TypeMismatch) in
 										(match sigma with
-											| [] -> Printf.printf "Did not match with %s\n" (print_clause cl); goalloop prg tl goal goals (List.tl stack)
-											| _ -> Printf.printf "Matched with %s\n" (print_clause cl); let remgoals = matchgoal cl goal goals in 
-													Printf.printf "%s\n" (print_alist remgoals); (match remgoals with
+											| [] -> goalloop prg tl goal goals (List.tl stack)
+											| _ -> let remgoals = matchgoal cl goal goals in (match remgoals with
 													| [] -> if stack=[] then [(compose sigma subsnamed)] else [(compose sigma subsnamed)]@(goalloop prg tl goal goals (List.tl stack))
 													| _ -> (evalquery (map incratom (map (subst sigma) remgoals)) prg (compose sigma subsnamed) ([goal::goals,tl]@stack)) ))
 								| [] -> if stack=[] then [] else 
@@ -244,8 +204,7 @@ let rec evaluate program querylist = let stripquery queries = (match queries wit
 						
 (* Test Cases *)
 (* Test Case 1 *)
-
-(* let goal1 = PredSym ("append", [FuncSym (List, [Const 1; FuncSym (List, [Const 2])]); FuncSym (List, [Const 3; FuncSym (List, [Const 4; Const 5])]); Var ("#x",0)]);;
+let goal1 = PredSym ("append", [FuncSym (List, [Const 1; FuncSym (List, [Const 2])]); FuncSym (List, [Const 3; FuncSym (List, [Const 4; Const 5])]); Var ("#x",0)]);;
 let goal2 = PredSym ("append", [FuncSym (List, [Const 1]); FuncSym (List, [Const 3]); FuncSym(List, [Const 1; FuncSym (List, [Const 4])])]);;
 let goal3 = PredSym ("append", [FuncSym (List, []); FuncSym (List, [Const 3]); FuncSym(List, [Const 1])]);;
 let facth = PredSym ("append", [FuncSym (List, []); Var ("L",0); Var ("L",0)]);;
@@ -271,8 +230,7 @@ let prgm = [
 evalquery [goal2] prgm [] [];;
 evalquery [goal1] prgm [] [];;
 evaluate prgm (Query [goal1]);;
-evaluate prgm (Query [goal2]);; *)
-
+evaluate prgm (Query [goal2]);;
 (* append([],L,L).
 append([X|Xs],L,[X|L2]) :- append(Xs,L,L2). *)
 
@@ -295,9 +253,9 @@ let q1 = Query(
 			)]
 		);;
 let q2 = Query([PredSym ("member",[Var ("#Z",0); FuncSym (List, [Const 1; FuncSym (List, [Const 2])])])]);;
-(* evalquery [goal4] p [] [];; *)
-(* evalquery goals5 p [] [];; *)
-(* evaluate p q2;; *)
+evalquery [goal4] p [] [];;
+evalquery goals5 p [] [];;
+evaluate p q2;;
 evaluate p q1;;
 
 (* member(X,[X|Y]).
