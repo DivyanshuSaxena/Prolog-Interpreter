@@ -153,6 +153,10 @@ let incratom atom  = match atom with
 
 let rec increment e = (match e with (v,n,t) -> (v,n+1,increvar t));;
 
+let getfst v = match v with (f,s,t) -> f;;
+let getsnd v = match v with (f,s,t) -> s;;
+let gethird v = match v with (f,s,t) -> t;;
+
 let rec evalquery goals program rem subs stack = let subsnamed = (map increment subs) in 
 								match goals with
 								| [] -> [subsnamed]
@@ -164,8 +168,8 @@ let rec evalquery goals program rem subs stack = let subsnamed = (map increment 
 														Printf.printf "%s\n" (print_alist remgoals); (match remgoals with
 														| [] -> if stack=[] then (Printf.printf "Goals and stack empty\n"; [(compose sigma subsnamed)] ) else 
 															(Printf.printf "No more goals but stack remaining\n"; [(compose sigma subsnamed)]@(evalquery goals program tl [] (List.tl stack)) )
-														| _ -> (Printf.printf "Goals remaining\n"; (evalquery (map incratom (map (subst sigma) remgoals)) program program (compose sigma subsnamed) ([goals,tl]@stack))) ))
-									| [] -> if stack=[] then (Printf.printf "Program and stack empty\n"; []) else (Printf.printf "Program empty, stack remaining\n"; evalquery (fst (hd stack)) program (snd (hd stack)) [] (tl stack)) );;
+														| _ -> (Printf.printf "Goals remaining\n"; (evalquery (map incratom (map (subst sigma) remgoals)) program program (compose sigma subsnamed) ([goals,tl,subsnamed]@stack))) ))
+									| [] -> if stack=[] then (Printf.printf "Program and stack empty\n"; []) else (Printf.printf "Program empty, stack remaining\n"; evalquery (getfst (hd stack)) program (getsnd (hd stack)) (gethird (hd stack)) (tl stack)) );;
 
 (* let rec evalquery goals program subs stack = let subsnamed = (map increment subs) in
 						match goals with
@@ -185,7 +189,7 @@ let rec evaluate program querylist = let stripquery queries = (match queries wit
 						let goals = stripquery querylist in
 						(try
 							(* let rawsubslist = evalquery goals program [] [] in *)
-							let rawsubslist = evalquery goals program program [] [goals,program] in
+							let rawsubslist = evalquery goals program program [] [(goals,program,[])] in
 							let rec reduce subs ans = (match subs with
 										| (v,n,t)::tl -> if tl=[] then (if not (String.contains v '#') then ans else ((v,t)::ans)) else
 												(if (String.contains v '#') then reduce tl ((v,t)::ans) else reduce (map (substsubst [(v,n,t)]) tl) ans)
