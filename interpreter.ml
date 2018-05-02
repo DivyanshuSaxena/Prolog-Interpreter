@@ -1,6 +1,7 @@
 exception TypeMismatch;; 
 exception NotUnifiable;; 
 exception GoalUnmatched;;
+(* exception InvalidConstruct;; *)
 open List;;
 (* Sigma :- string * int * term list *) 
 (* Increment in substitution woring fine but unification with fact for bigger lists failing *)
@@ -22,6 +23,45 @@ let rec fold_left_concat f e l = match l with
 let rec search substlist a = match substlist with
 					| (e,n,t)::tl -> if (e,n)=a then t else search tl a
 					| [] -> raise TypeMismatch;;
+
+let rec print_term term = let rec print_tlist tlist = (match tlist with
+			    | hd::tl -> (print_term hd)^"; "^(print_tlist tl)
+			    | [] -> "]") in (match term with
+		    | Const n -> string_of_int n
+		    | Cons s -> s
+		    | Bool b -> string_of_bool b
+		    | Var (v,n) -> v
+		    | FuncSym (List,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Plus,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Minus,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Prod,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Div,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Mod,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Exp,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Eq,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Gt,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Lt,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Gte,tlist) -> "List["^(print_tlist tlist)
+		    | FuncSym (Lte,tlist) -> "List["^(print_tlist tlist) );;
+
+let print_atom atom = (match atom with
+    | PredSym(str,tlist) -> let rec print_tlist tlist = (match tlist with
+							    | hd::tl -> (print_term hd)^"; "^(print_tlist tl)
+							    | [] -> "]") in str^"["^(print_tlist tlist)
+    | Cut -> "Cut" | Fail -> "Fail");;
+
+let rec print_alist alist = (match alist with
+	| hd::tl -> (print_atom hd)^"; "^(print_alist tl)
+	| [] -> "]");;
+
+let print_clause clause = (match clause with
+    | Fact atom -> (print_atom atom)^"."
+    | Rule (atom,alist) -> (print_atom atom)^":- ["^(print_alist alist)^"."
+    | _ -> raise InvalidConstruct);;
+
+let rec print_program prg = (match prg with
+    | hd::tl -> (print_clause hd)^"; "^(print_program tl)
+    | [] -> "]");;
 
 let rec substitute s t = match t with
 				| Const s -> Const s
@@ -113,7 +153,20 @@ let incratom atom  = match atom with
 
 let rec increment e = (match e with (v,n,t) -> (v,n+1,increvar t));;
 
-let rec evalquery goals program subs stack = let subsnamed = (map increment subs) in
+let rec evalquery goals program rem subs stack = let subsnamed = (map increment subs) in 
+								match goals with
+								| [] -> [subsnamed]
+								| currgoal::nextgoals -> let goals = currgoal::nextgoals in (match rem with
+									| cl::tl -> let sigma = (match cl with | Fact h -> (unify h (hd goals)) | Rule (h,b) -> (unify h (hd goals)) | _ -> raise TypeMismatch) in
+											(match sigma with
+												| [] -> evalquery goals program tl subs stack
+												| _ -> let remgoals = matchgoal cl (hd goals) (List.tl goals) in 
+														Printf.printf "%s\n" (print_alist remgoals); (match remgoals with
+														| [] -> if stack=[] then (Printf.printf "Goals and stack empty\n"; [(compose sigma subsnamed)] ) else (Printf.printf "No more goals but stack remaining\n"; [(compose sigma subsnamed)]@(evalquery goals program tl [] (List.tl stack)) )
+														| _ -> (Printf.printf "Goals remaining\n"; (evalquery (map incratom (map (subst sigma) remgoals)) program program (compose sigma subsnamed) ([goals,tl]@stack))) ))
+									| [] -> if stack=[] then (Printf.printf "Program and stack empty\n"; []) else (Printf.printf "Program empty, stack remaining\n"; evalquery (fst (hd stack)) program (snd (hd stack)) subs (tl stack)) );;
+
+(* let rec evalquery goals program subs stack = let subsnamed = (map increment subs) in
 						match goals with
 						| [] -> [subsnamed]
 						| currgoal::gl ->  let rec goalloop prg rem goal goals stack = (match rem with
@@ -125,12 +178,13 @@ let rec evalquery goals program subs stack = let subsnamed = (map increment subs
 													| _ -> (evalquery (map incratom (map (subst sigma) remgoals)) prg (compose sigma subsnamed) ([goal::goals,tl]@stack)) ))
 								| [] -> if stack=[] then [] else 
 											goalloop prg (snd (hd stack)) (hd (fst (hd stack))) (tl (fst (hd stack))) (tl stack) ) in 
-										(goalloop program program currgoal gl ((currgoal::gl,List.tl program)::stack));;
+										(goalloop program program currgoal gl ((currgoal::gl,List.tl program)::stack));; *)
 
 let rec evaluate program querylist = let stripquery queries = (match queries with | (Query l) -> l | _ -> raise TypeMismatch) in
 						let goals = stripquery querylist in
 						(try
-							let rawsubslist = evalquery goals program [] [] in
+							(* let rawsubslist = evalquery goals program [] [] in *)
+							let rawsubslist = evalquery goals program program [] [goals,program] in
 							let rec reduce subs ans = (match subs with
 										| (v,n,t)::tl -> if tl=[] then (if not (String.contains v '#') then ans else ((v,t)::ans)) else
 												(if (String.contains v '#') then reduce tl ((v,t)::ans) else reduce (map (substsubst [(v,n,t)]) tl) ans)
@@ -145,8 +199,7 @@ let rec evaluate program querylist = let stripquery queries = (match queries wit
 							| [] -> raise GoalUnmatched
 							| _ -> (map convans (reducelist rawsubslist))
 						with
-						| GoalUnmatched -> [Claim false]
-						| _ -> failwith "Unknown");;
+						| GoalUnmatched -> [Claim false]);;
 						
 (* Test Cases *)
 (* Test Case 1 *)
