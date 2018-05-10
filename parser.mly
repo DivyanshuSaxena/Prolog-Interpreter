@@ -41,9 +41,10 @@ termlist: term LISTSEP term			{ ($1)::[$3] }
 term: Const 						{ Const($1) }
 	| Bool 							{ Bool($1) }
 	| Var 							{ Var($1,0) }
+	| OSQUARE CSQUARE		 		{ FuncSym(List,[]) }
 	| OSQUARE termlist CSQUARE 		{ FuncSym(List,$2) }
 	| symbol termlist				{ FuncSym($1,$2) }
-	| Id							{ Cons($1) }
+	| Id							{ let () = Printf.printf "Found Id\n" in Cons($1) }
 
 symbol:	PLUS						{ Plus }
 	| MINUS 						{ Minus }

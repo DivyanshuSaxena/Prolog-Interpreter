@@ -34,5 +34,5 @@ rule token = parse
   | ['A'-'Z']['a'-'z''A'-'Z''0'-'9']* as var  {let () = Printf.printf "Var \n" in Var(var)}
   | ['a'-'z']['a'-'z''A'-'Z''0'-'9']* as str  {let () = Printf.printf "Id \n" in Id(str)}
   | eol                 { token lexbuf }
-  | eof                 { raise Eof }
+  | eof                 { EOF }
 

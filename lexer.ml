@@ -668,7 +668,7 @@ let
 
   | 28 ->
 # 37 "lexer.mll"
-                        ( raise Eof )
+                        ( EOF )
 # 673 "lexer.ml"
 
   | __ocaml_lex_state -> lexbuf.Lexing.refill_buff lexbuf; 

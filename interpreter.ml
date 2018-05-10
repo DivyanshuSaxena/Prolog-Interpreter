@@ -24,7 +24,7 @@ let rec search substlist a = match substlist with
 					| (e,n,t)::tl -> if (e,n)=a then t else search tl a
 					| [] -> raise TypeMismatch;;
 
-let rec print_term term = let rec print_tlist tlist = (match tlist with
+(* let rec print_term term = let rec print_tlist tlist = (match tlist with
 			    | hd::tl -> (print_term hd)^"; "^(print_tlist tl)
 			    | [] -> "]") in (match term with
 		    | Const n -> string_of_int n
@@ -61,7 +61,7 @@ let print_clause clause = (match clause with
 
 let rec print_program prg = (match prg with
     | hd::tl -> (print_clause hd)^"; "^(print_program tl)
-    | [] -> "]");;
+    | [] -> "]");; *)
 
 let rec substitute s t = match t with
 				| Const s -> Const s
@@ -165,7 +165,7 @@ let rec evalquery goals program rem subs stack = let subsnamed = (map increment 
 											(match sigma with
 												| [] -> evalquery goals program tl subs stack
 												| _ -> let remgoals = matchgoal cl (hd goals) (List.tl goals) in 
-														Printf.printf "%s\n" (print_alist remgoals); (match remgoals with
+														(* Printf.printf "%s\n" (print_alist remgoals); *) (match remgoals with
 														| [] -> if stack=[] then (Printf.printf "Goals and stack empty\n"; [(compose sigma subsnamed)] ) else 
 															(Printf.printf "No more goals but stack remaining\n"; [(compose sigma subsnamed)]@(evalquery goals program tl [] (List.tl stack)) )
 														| _ -> (Printf.printf "Goals remaining\n"; (evalquery (map incratom (map (subst sigma) remgoals)) program program (compose sigma subsnamed) ([goals,tl,subsnamed]@stack))) ))
