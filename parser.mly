@@ -18,7 +18,7 @@ open Interpreter
 %%
 
 main: EOF							{ [] }
-	| clauselist main				{ $1 }
+	| clauselist main				{ ($1)@($2) }
 
 clauselist: clause COMMA clauselist	{ ($1)::($3) }
 	| clause 						{ [$1] }

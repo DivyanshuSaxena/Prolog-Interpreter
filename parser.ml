@@ -244,7 +244,7 @@ let yyact = [|
     let _2 = (Parsing.peek_val __caml_parser_env 0 : Interpreter.program) in
     Obj.repr(
 # 21 "parser.mly"
-                      ( _1 )
+                      ( (_1)@(_2) )
 # 249 "parser.ml"
                : Interpreter.program))
 ; (fun __caml_parser_env ->
