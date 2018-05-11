@@ -160,30 +160,18 @@ let gethird v = match v with (f,s,t) -> t;;
 let rec evalquery goals program rem subs stack = let subsnamed = (map increment subs) in 
 								match goals with
 								| [] -> [subsnamed]
+								| Cut::nextgoals -> evalquery nextgoals program rem subsnamed []
+								| Fail:: nextgoals -> raise GoalUnmatched
 								| currgoal::nextgoals -> let goals = currgoal::nextgoals in (match rem with
 									| cl::tl -> let sigma = (match cl with | Fact h -> (unify h (hd goals)) | Rule (h,b) -> (unify h (hd goals)) | _ -> raise TypeMismatch) in
 											(match sigma with
 												| [] -> evalquery goals program tl subs stack
 												| _ -> let remgoals = matchgoal cl (hd goals) (List.tl goals) in 
 														(* Printf.printf "%s\n" (print_alist remgoals); *) (match remgoals with
-														| [] -> if stack=[] then (Printf.printf "Goals and stack empty\n"; [(compose sigma subsnamed)] ) else 
-															(Printf.printf "No more goals but stack remaining\n"; [(compose sigma subsnamed)]@(evalquery goals program tl [] (List.tl stack)) )
-														| _ -> (Printf.printf "Goals remaining\n"; (evalquery (map incratom (map (subst sigma) remgoals)) program program (compose sigma subsnamed) ([goals,tl,subsnamed]@stack))) ))
-									| [] -> if stack=[] then (Printf.printf "Program and stack empty\n"; []) else (Printf.printf "Program empty, stack remaining\n"; evalquery (getfst (hd stack)) program (getsnd (hd stack)) (gethird (hd stack)) (tl stack)) );;
-
-(* let rec evalquery goals program subs stack = let subsnamed = (map increment subs) in
-						match goals with
-						| [] -> [subsnamed]
-						| currgoal::gl ->  let rec goalloop prg rem goal goals stack = (match rem with
-								| cl::tl -> let sigma = (match cl with | Fact h -> (unify h goal) | Rule (h,b) -> (unify h goal) | _ -> raise TypeMismatch) in
-										(match sigma with
-											| [] -> goalloop prg tl goal goals (List.tl stack)
-											| _ -> let remgoals = matchgoal cl goal goals in (match remgoals with
-													| [] -> if stack=[] then [(compose sigma subsnamed)] else [(compose sigma subsnamed)]@(goalloop prg tl goal goals (List.tl stack))
-													| _ -> (evalquery (map incratom (map (subst sigma) remgoals)) prg (compose sigma subsnamed) ([goal::goals,tl]@stack)) ))
-								| [] -> if stack=[] then [] else 
-											goalloop prg (snd (hd stack)) (hd (fst (hd stack))) (tl (fst (hd stack))) (tl stack) ) in 
-										(goalloop program program currgoal gl ((currgoal::gl,List.tl program)::stack));; *)
+														| [] -> if stack=[] then ((* Printf.printf "Goals and stack empty\n"; *) [(compose sigma subsnamed)] ) else 
+															((* Printf.printf "No more goals but stack remaining\n"; *) [(compose sigma subsnamed)]@(evalquery goals program tl [] (List.tl stack)) )
+														| _ -> ((* Printf.printf "Goals remaining\n"; *) (evalquery (map incratom (map (subst sigma) remgoals)) program program (compose sigma subsnamed) ([goals,tl,subsnamed]@stack))) ))
+									| [] -> if stack=[] then ((* Printf.printf "Program and stack empty\n"; *) []) else ((* Printf.printf "Program empty, stack remaining\n"; *) evalquery (getfst (hd stack)) program (getsnd (hd stack)) (gethird (hd stack)) (tl stack)) );;
 
 let rec evaluate program querylist = let stripquery queries = (match queries with | (Query l) -> l | _ -> raise TypeMismatch) in
 						let goals = stripquery querylist in
