@@ -32,3 +32,5 @@ type token =
 
 val main :
   (Lexing.lexbuf  -> token) -> Lexing.lexbuf -> Interpreter.program
+val goal :
+  (Lexing.lexbuf  -> token) -> Lexing.lexbuf -> Interpreter.clause

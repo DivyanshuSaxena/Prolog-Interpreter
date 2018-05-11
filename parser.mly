@@ -1,5 +1,6 @@
 %{
 open Interpreter
+open Printf
 %}
 
 %token <string> Var Id 
@@ -13,24 +14,28 @@ open Interpreter
 %token EOF
 
 %start main
+%start goal
 %type <Interpreter.program> main
+%type <Interpreter.clause> goal
 
 %%
 
 main: EOF							{ [] }
 	| clauselist main				{ ($1)@($2) }
 
+goal: atomlist						{ Query($1) }
+
 clauselist: clause COMMA clauselist	{ ($1)::($3) }
 	| clause 						{ [$1] }
 
-clause: QUERY atomlist END			{ let () = Printf.printf "Query\n" in Query($2) }
+clause: QUERY atomlist END			{ Query($2) }
 	| atom END						{ Fact($1) }
 	| atom SEP atomlist END			{ Rule($1,$3) }
 
 atomlist: atom COMMA atomlist		{ ($1)::($3) }
-	| atom 							{ let () = Printf.printf "Single atom\n" in [$1] }
+	| atom 							{ [$1] }
 
-atom: Id OPAREN termlist CPAREN		{ let () = Printf.printf "PredSym\n" in PredSym($1,$3) }
+atom: Id OPAREN termlist CPAREN		{ PredSym($1,$3) }
 	| CUT 							{ Cut }
 	| FAIL 							{ Fail }
 
@@ -44,7 +49,7 @@ term: Const 						{ Const($1) }
 	| OSQUARE CSQUARE		 		{ FuncSym(List,[]) }
 	| OSQUARE termlist CSQUARE 		{ FuncSym(List,$2) }
 	| symbol termlist				{ FuncSym($1,$2) }
-	| Id							{ let () = Printf.printf "Found Id\n" in Cons($1) }
+	| Id							{ Cons($1) }
 
 symbol:	PLUS						{ Plus }
 	| MINUS 						{ Minus }

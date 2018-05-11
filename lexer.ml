@@ -523,82 +523,82 @@ let
 # 524 "lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_start_pos lexbuf.Lexing.lex_curr_pos in
 # 10 "lexer.mll"
-                        ( let () = Printf.printf "Const\n" in Const(int_of_string num) )
+                        ( let () = Printf.printf "Const" in Const(int_of_string num) )
 # 528 "lexer.ml"
 
   | 2 ->
 # 11 "lexer.mll"
-                        ( let () = Printf.printf "True\n" in Bool(true) )
+                        ( let () = Printf.printf "True" in Bool(true) )
 # 533 "lexer.ml"
 
   | 3 ->
 # 12 "lexer.mll"
-                        ( let () = Printf.printf "False\n" in Bool(false) )
+                        ( let () = Printf.printf "False" in Bool(false) )
 # 538 "lexer.ml"
 
   | 4 ->
 # 13 "lexer.mll"
-                        ( let () = Printf.printf "+\n" in PLUS )
+                        ( let () = Printf.printf "+" in PLUS )
 # 543 "lexer.ml"
 
   | 5 ->
 # 14 "lexer.mll"
-                        ( let () = Printf.printf "-\n" in MINUS )
+                        ( let () = Printf.printf "-" in MINUS )
 # 548 "lexer.ml"
 
   | 6 ->
 # 15 "lexer.mll"
-                        ( let () = Printf.printf "*\n" in PROD )
+                        ( let () = Printf.printf "*" in PROD )
 # 553 "lexer.ml"
 
   | 7 ->
 # 16 "lexer.mll"
-                        ( let () = Printf.printf "/\n" in DIV )
+                        ( let () = Printf.printf "/" in DIV )
 # 558 "lexer.ml"
 
   | 8 ->
 # 17 "lexer.mll"
-                        ( let () = Printf.printf "^\n" in EXP )
+                        ( let () = Printf.printf "^" in EXP )
 # 563 "lexer.ml"
 
   | 9 ->
 # 18 "lexer.mll"
-                        ( let () = Printf.printf "=\n" in EQ )
+                        ( let () = Printf.printf "=" in EQ )
 # 568 "lexer.ml"
 
   | 10 ->
 # 19 "lexer.mll"
-                        ( let () = Printf.printf ">\n" in GT )
+                        ( let () = Printf.printf ">" in GT )
 # 573 "lexer.ml"
 
   | 11 ->
 # 20 "lexer.mll"
-                        ( let () = Printf.printf "<\n" in LT )
+                        ( let () = Printf.printf "<" in LT )
 # 578 "lexer.ml"
 
   | 12 ->
 # 21 "lexer.mll"
-                        ( let () = Printf.printf "[\n" in OSQUARE )
+                        ( let () = Printf.printf "[" in OSQUARE )
 # 583 "lexer.ml"
 
   | 13 ->
 # 22 "lexer.mll"
-                        ( let () = Printf.printf "]\n" in CSQUARE )
+                        ( let () = Printf.printf "]" in CSQUARE )
 # 588 "lexer.ml"
 
   | 14 ->
 # 23 "lexer.mll"
-                        ( let () = Printf.printf "|\n" in LISTSEP )
+                        ( let () = Printf.printf "|" in LISTSEP )
 # 593 "lexer.ml"
 
   | 15 ->
 # 24 "lexer.mll"
-                        ( let () = Printf.printf ">=\n" in GTE )
+                        ( let () = Printf.printf ">=" in GTE )
 # 598 "lexer.ml"
 
   | 16 ->
 # 25 "lexer.mll"
-                        ( let () = Printf.printf "<=\n" in LTE )
+                        ( let () = Printf.printf "<=" in LTE )
 # 603 "lexer.ml"
 
   | 17 ->
@@ -618,27 +618,27 @@ let
 
   | 20 ->
 # 29 "lexer.mll"
-                        ( let () = Printf.printf ":- \n" in SEP )
+                        ( let () = Printf.printf ":- " in SEP )
 # 623 "lexer.ml"
 
   | 21 ->
 # 30 "lexer.mll"
-                        ( let () = Printf.printf ",\n" in COMMA )
+                        ( let () = Printf.printf "," in COMMA )
 # 628 "lexer.ml"
 
   | 22 ->
 # 31 "lexer.mll"
-                        ( let () = Printf.printf "Query\n" in QUERY )
+                        ( let () = Printf.printf "Query" in QUERY )
 # 633 "lexer.ml"
 
   | 23 ->
 # 32 "lexer.mll"
-                        ( let () = Printf.printf "(\n" in OPAREN )
+                        ( let () = Printf.printf "(" in OPAREN )
 # 638 "lexer.ml"
 
   | 24 ->
 # 33 "lexer.mll"
-                        ( let () = Printf.printf ")\n" in CPAREN )
+                        ( let () = Printf.printf ")" in CPAREN )
 # 643 "lexer.ml"
 
   | 25 ->
@@ -648,7 +648,7 @@ let
 # 649 "lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_start_pos lexbuf.Lexing.lex_curr_pos in
 # 34 "lexer.mll"
-                                              (let () = Printf.printf "Var \n" in Var(var))
+                                              (let () = Printf.printf "Var " in Var(var))
 # 653 "lexer.ml"
 
   | 26 ->
@@ -658,7 +658,7 @@ let
 # 659 "lexer.ml"
 = Lexing.sub_lexeme lexbuf lexbuf.Lexing.lex_start_pos lexbuf.Lexing.lex_curr_pos in
 # 35 "lexer.mll"
-                                              (let () = Printf.printf "Id \n" in Id(str))
+                                              (let () = Printf.printf "Id " in Id(str))
 # 663 "lexer.ml"
 
   | 27 ->

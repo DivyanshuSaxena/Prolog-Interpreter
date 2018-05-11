@@ -1,8 +1,10 @@
+open List;;
+open Unix;;
+
 exception TypeMismatch;; 
 exception NotUnifiable;; 
 exception GoalUnmatched;;
-(* exception InvalidConstruct;; *)
-open List;;
+exception InvalidConstruct;;
 (* Sigma :- string * int * term list *) 
 (* Increment in substitution woring fine but unification with fact for bigger lists failing *)
 type symbol = List | Plus | Minus | Prod | Div | Mod | Exp | Eq | Gt | Lt | Gte | Lte;;
@@ -24,7 +26,7 @@ let rec search substlist a = match substlist with
 					| (e,n,t)::tl -> if (e,n)=a then t else search tl a
 					| [] -> raise TypeMismatch;;
 
-(* let rec print_term term = let rec print_tlist tlist = (match tlist with
+let rec print_term term = let rec print_tlist tlist = (match tlist with
 			    | hd::tl -> (print_term hd)^"; "^(print_tlist tl)
 			    | [] -> "]") in (match term with
 		    | Const n -> string_of_int n
@@ -61,7 +63,16 @@ let print_clause clause = (match clause with
 
 let rec print_program prg = (match prg with
     | hd::tl -> (print_clause hd)^"; "^(print_program tl)
-    | [] -> "]");; *)
+    | [] -> "]");;
+
+let rec print_answer ans = match ans with
+	| Map l -> let rec print_maplist mapl = (match mapl with
+				| (v,t)::tl -> " ("^v^","^(print_term t)^(print_maplist tl)^") "
+				| [] -> "]") in "["^(print_maplist l)
+	| Claim true -> "true"
+	| Claim false -> "false";;
+
+let rec print_anslist al = String.concat ";" (map print_answer al);;
 
 let rec substitute s t = match t with
 				| Const s -> Const s
